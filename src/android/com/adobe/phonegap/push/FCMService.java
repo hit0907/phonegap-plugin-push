@@ -32,6 +32,7 @@ import android.util.Log;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import com.inet.evernet.R;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,6 +40,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -74,6 +76,7 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
     String from = message.getFrom();
     Log.d(LOG_TAG, "onMessage - from: " + from);
 
+
     Bundle extras = new Bundle();
 
     if (message.getNotification() != null) {
@@ -83,7 +86,18 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
       extras.putString(ICON, message.getNotification().getIcon());
       extras.putString(COLOR, message.getNotification().getColor());
     }
+
+    // Note: add by hanhld@inetcloud.vn
+    // Message receive was encoded by url_encode
+    // Need to decode message to have correct message
     for (Map.Entry<String, String> entry : message.getData().entrySet()) {
+      if (entry.getKey().equals("sender") || entry.getKey().equals("alert")) {
+        try {
+          entry.setValue(java.net.URLDecoder.decode(entry.getValue(), "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+          e.printStackTrace();
+        }
+      }
       extras.putString(entry.getKey(), entry.getValue());
     }
 
@@ -363,7 +377,10 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
     String packageName = context.getPackageName();
     Resources resources = context.getResources();
 
-    int notId = parseInt(NOT_ID, extras);
+//    int notId = parseInt(NOT_ID, extras);
+    int notId = new Random().nextInt();
+
+
     Intent notificationIntent = new Intent(this, PushHandlerActivity.class);
     notificationIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
     notificationIntent.putExtra(PUSH_BUNDLE, extras);
@@ -407,8 +424,11 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
       mBuilder = new NotificationCompat.Builder(context);
     }
 
-    mBuilder.setWhen(System.currentTimeMillis()).setContentTitle(fromHtml(extras.getString(TITLE)))
-        .setTicker(fromHtml(extras.getString(TITLE))).setContentIntent(contentIntent).setDeleteIntent(deleteIntent)
+    mBuilder.setWhen(System.currentTimeMillis())
+        .setContentTitle(fromHtml(extras.getString(TITLE)))
+        .setTicker(fromHtml(extras.getString(TITLE)))
+        .setContentIntent(contentIntent)
+        .setDeleteIntent(deleteIntent)
         .setAutoCancel(true);
 
     SharedPreferences prefs = context.getSharedPreferences(PushPlugin.COM_ADOBE_PHONEGAP_PUSH, Context.MODE_PRIVATE);
@@ -505,6 +525,7 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
      * Notification add actions
      */
     createActions(extras, mBuilder, resources, packageName, notId);
+
 
     mNotificationManager.notify(appName, notId, mBuilder.build());
   }
@@ -835,6 +856,7 @@ public class FCMService extends FirebaseMessagingService implements PushConstant
             mBuilder.setLargeIcon(largeIconBitmap);
             Log.d(LOG_TAG, "using resources large-icon from gcm");
           } else {
+            mBuilder.setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher));
             Log.d(LOG_TAG, "Not setting large icon");
           }
         }
